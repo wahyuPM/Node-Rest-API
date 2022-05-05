@@ -5,7 +5,16 @@ const { validationResult } = require('express-validator/check');
 const Post = require('../models/post');
 
 exports.getPosts = (req, res, next) => {
-  Post.find()
+  const currentPage = req.query.page || 1;
+  const perPage = 2;
+  let totalItems;
+  Post.find().countDocuments()
+    .then(count => {
+      totalItems = count;
+      return Post.find()
+        .skip((currentPage - 1) * perPage)
+        .limit(perPage);
+    })
     .then(posts => {
       if (!posts) {
         const error = new Error('Could not find posts.');
@@ -14,7 +23,8 @@ exports.getPosts = (req, res, next) => {
       }
       res.status(200).json({
         message: 'Posts fetched successfully!',
-        posts: posts
+        posts: posts,
+        totalItems: totalItems
       });
     })
     .catch(err => {
@@ -23,6 +33,7 @@ exports.getPosts = (req, res, next) => {
       }
       next(err);
     });
+
 };
 
 exports.createPost = (req, res, next) => {
@@ -125,6 +136,34 @@ exports.updatePost = (req, res, next) => {
         message: 'Post updated successfully!',
         post: result
       });
+    })
+    .catch(err => {
+      if (!err.statusCode) {
+        err.statusCode = 500;
+      }
+      next(err);
+    });
+}
+
+exports.deletePost = (req, res, next) => {
+  const postId = req.params.postId;
+  Post.findById(postId)
+    .then(post => {
+      if (!post) {
+        const error = new Error('Could not find post.');
+        error.statusCode = 404;
+        throw error;
+      }
+      // if (post.creator.name !== 'Maximilian') {
+      //   const error = new Error('Not authorized!');
+      //   error.statusCode = 403;
+      //   throw error;
+      // }
+      clearImage(post.imageUrl);
+      return Post.findByIdAndRemove(postId);
+    })
+    .then(result => {
+      res.status(200).json({ message: 'Post deleted.' });
     })
     .catch(err => {
       if (!err.statusCode) {

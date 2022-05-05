@@ -7,6 +7,7 @@ const multer = require('multer');
 const MONGODB_URI = 'mongodb+srv://wahyuPratama191:Ba929752@cluster0.mickw.mongodb.net/messages'
 
 const feedRoutes = require('./routes/feed');
+const authRoutes = require('./routes/auth');
 
 const app = express();
 
@@ -45,6 +46,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/feed', feedRoutes);
+app.use('/auth', feedRoutes);
 
 app.use((error, req, res, next) => {
     console.log(error);
