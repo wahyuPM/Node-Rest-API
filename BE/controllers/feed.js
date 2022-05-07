@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+
 const { validationResult } = require('express-validator/check');
 
+const io = require('../socket');
 const Post = require('../models/post');
 const User = require('../models/user');
 
@@ -11,7 +13,7 @@ exports.getPosts = async (req, res, next) => {
   let totalItems;
   try {
     const count = await Post.find().countDocuments()
-    const post = await Post.find().populate('creator').skip((currentPage - 1) * perPage).limit(perPage);
+    const post = await Post.find().populate('creator', '-password -posts').skip((currentPage - 1) * perPage).limit(perPage);
     totalItems = count;
 
     res.status(200).json({
@@ -25,8 +27,6 @@ exports.getPosts = async (req, res, next) => {
     }
     next(error);
   }
-
-
 };
 
 exports.createPost = async (req, res, next) => {
@@ -55,6 +55,10 @@ exports.createPost = async (req, res, next) => {
     const user = await User.findById(req.userId); // returns a promise that resolves to the user
     user.posts.push(post); // push the post to the user's posts array
     await user.save(); // save the user
+    io.getIO().emit('posts', {
+      action: 'create',
+      post: { ...post._doc, creator: { _id: req.userId, name: user.name } }
+    }); // emit the event to the client
     res.status(201).json({
       message: 'Post created successfully!',
       post: post, // the post that was created
@@ -75,7 +79,7 @@ exports.createPost = async (req, res, next) => {
 exports.getPostById = async (req, res, next) => {
   const postId = req.params.postId;
   try {
-    const result = await Post.findById(postId);
+    const result = await Post.findById(postId).populate('creator', '-password -posts');
     if (!result) {
       const error = new Error('Could not find post.');
       error.statusCode = 404;
